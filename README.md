@@ -1,54 +1,292 @@
 # Cadê? 🔎
- 
+
 > Memória externa para objetos físicos: registre onde guardou e encontre depois, sem esforço.
- 
+
 ## Sobre o projeto
- 
+
 Pessoas guardam objetos em lugares que fazem sentido na hora, mas esquecem onde. O resultado é tempo perdido, recompra e frustração.
- 
+
 O **Cadê?** é um aplicativo que resolve isso com um registro de baixíssimo esforço (foto ou voz) no momento de guardar e uma busca simples para achar o objeto depois.
- 
+
 ## Público-alvo (personas)
- 
+
 Baseadas nas entrevistas com Claites, José e Ricardo.
- 
+
 | Persona | O que precisa |
 |---|---|
 | **Claites** | Foto do local e poucos passos para registrar e consultar |
 | **José** | Uso offline, cadastro simples e permissões transparentes |
 | **Ricardo** | App rápido (desiste em menos de 10 min) e com dados locais |
- 
+
 ## Hipótese do MVP
- 
+
 > Se o usuário conseguir registrar um objeto em poucos toques e achá-lo depois com uma busca simples, ele confia no app e continua usando.
- 
-Isso ataca os principais riscos de adoção: cadastro trabalhoso e busca lenta.
- 
+
 ## Funcionalidades
- 
-A jornada do usuário se organiza em cinco atividades:
- 
+
 - **Registrar:** foto do objeto, nome curto, local (texto e foto, reaproveitando locais já usados) e áudio.
 - **Encontrar:** busca por texto com foto na primeira tela, filtro por local ou categoria.
 - **Consultar:** detalhe do objeto com foto do item, foto do local, nome, data do registro e áudio.
 - **Manter:** mudar o local, excluir objeto ou local e aviso de registro antigo.
 - **Confiança:** uso offline com dados só no aparelho, permissões explicadas, compressão de mídia, backup manual e tutorial.
+
+> **Decisão de projeto:** o app **não tem cadastro de usuário**. Os dados ficam apenas no aparelho, o que reduz o atrito de uso (persona Ricardo) e respeita a privacidade (persona José).
+
+---
+
+## Tecnologias
+
+| Item | Tecnologia |
+|---|---|
+| Framework | Flutter (Dart 3 ou superior) |
+| Banco de dados | SQLite, via [Drift](https://drift.simonbinder.eu) |
+| Arquitetura | MVVM |
+| Estado | `ChangeNotifier` com `provider` |
+| Fotos | `image_picker` (câmera, galeria e compressão) |
+| Áudio | `record` (gravação em AAC de baixa taxa) |
+| Permissões | `permission_handler` |
+
+## Arquitetura (MVVM)
+
+O projeto é organizado em camadas, e dentro de `ui/` cada funcionalidade tem uma View e um ViewModel.
+
+```
+lib/
+├── main.dart
+├── app.dart                      # MaterialApp, rotas e injeção de dependências
+│
+├── core/
+│   ├── theme/                    # cores e estilos
+│   ├── routes/                   # nomes e configuração de rotas
+│   └── utils/
+│       └── formatadores.dart     # tamanho em bytes, datas etc.
+│
+├── domain/
+│   └── models/                   # MODEL: classes puras do domínio
+│       ├── objeto.dart
+│       ├── local.dart
+│       ├── categoria.dart
+│       └── objeto_detalhe.dart   # objeto + local + categoria, para busca e detalhe
+│
+├── data/
+│   ├── services/                 # acesso a recursos externos
+│   │   ├── cade_database.dart    # banco SQLite (Drift)
+│   │   ├── midia_service.dart    # capturar, comprimir e apagar foto/áudio (US14)
+│   │   └── permissao_service.dart# câmera e microfone (US13)
+│   └── repositories/             # traduz linhas do banco <-> Model
+│       ├── objeto_repository.dart
+│       ├── local_repository.dart
+│       ├── categoria_repository.dart
+│       └── mappers.dart          # ObjetoRow/LocalRow/CategoriaRow -> models
+│
+└── ui/
+    ├── core/
+    │   ├── base_view_model.dart  # estado de tela compartilhado
+    │   └── widgets/              # widgets reutilizáveis (cartão de objeto etc.)
+    ├── registrar/                # US01 a US04
+    │   ├── registrar_view.dart
+    │   └── registrar_view_model.dart
+    ├── buscar/                   # US05, US06
+    │   ├── buscar_view.dart
+    │   └── buscar_view_model.dart
+    ├── detalhe/                  # US07 a US11
+    │   ├── detalhe_view.dart
+    │   └── detalhe_view_model.dart
+    └── configuracoes/            # US14, US15 (espaço usado e backup)
+        ├── configuracoes_view.dart
+        └── configuracoes_view_model.dart
+```
+
+### Responsabilidade de cada camada
+
+| Camada | Responsabilidade | Não deve |
+|---|---|---|
+| **View** | Desenhar a tela e reagir a toques | Ter regra de negócio ou falar com o banco |
+| **ViewModel** | Guardar o estado da tela, validar e chamar os repositories | Importar widgets nem conhecer SQL |
+| **Repository** | Converter as linhas do banco (`ObjetoRow`, `LocalRow`) em Models (`Objeto`, `Local`) e coordenar banco e arquivos | Conhecer a tela |
+| **Service** | Falar com o SQLite, arquivos e permissões | Saber das regras da tela |
+| **Model** | Representar os dados do domínio | Depender de Flutter ou do banco |
+
+O fluxo segue sempre uma direção: **View → ViewModel → Repository → Service**. Os dados voltam pelo caminho inverso, e a View só enxerga o ViewModel.
+
+### Models
+
+| Classe | Papel |
+|---|---|
+| `Objeto` | Objeto registrado. Tem `temFoto`, `temAudio` e `registroAntigo()` (US11) |
+| `Local` | Lugar onde objetos são guardados, reaproveitado entre vários objetos |
+| `Categoria` | Tipo do objeto (Documentos, Chaves...) |
+| `ObjetoDetalhe` | `Objeto` + `Local` + `Categoria` opcional, usado nas telas de busca e detalhe |
+
+Os models são classes puras de Dart: não dependem de Flutter nem do Drift. A conversão das linhas do banco é feita só nos repositories, por `mappers.dart`.
+
+### ViewModels
+
+Todos estendem `BaseViewModel`, que guarda o estado da tela (`inicial`, `carregando`, `sucesso`, `vazio`, `erro`) e a mensagem de erro, para o app nunca ficar travado sem explicação.
+
+| ViewModel | Responsabilidade | Histórias |
+|---|---|---|
+| `RegistrarViewModel` | Formulário (só nome e local são obrigatórios), fotos, áudio e avisos de permissão. Apaga as mídias capturadas se o usuário sair sem salvar | US01 a US04, US13 |
+| `BuscarViewModel` | Busca com espera de 300 ms após a última letra, filtros por local e categoria, descarte de consultas antigas | US05, US06 |
+| `DetalheViewModel` | Carrega o objeto, muda o local, exclui e confirma que "continua aqui" | US07 a US11 |
+| `ConfiguracoesViewModel` | Espaço usado pelas mídias (backup na R2) | US14, US15 |
+
+### Repositories
+
+| Repository | Métodos |
+|---|---|
+| `ObjetoRepository` | `registrar`, `buscar(termo, {localId, categoriaId})`, `obter`, `mover`, `excluir`, `listarAntigos` |
+| `LocalRepository` | `listar`, `excluir` |
+| `CategoriaRepository` | `listar` |
+
+Pontos importantes:
+- Os filtros por local e categoria são aplicados em memória, no repository. Se a lista crescer, mova-os para uma consulta no `CadeDatabase`.
+- `ObjetoRepository.excluir` apaga a foto e o áudio do objeto, mas não a foto do local, porque outros objetos podem usá-la.
+- Se `registrar` falhar, as mídias não são apagadas: o ViewModel ainda as tem e o usuário pode tentar de novo.
+
+---
+
+## Mídia e permissões (services)
+
+### MidiaService (US01, US03, US04, US10, US14)
+
+- **Fotos:** tira pela câmera ou escolhe da galeria, já reduzidas (lado máximo de 1280 px, qualidade 70).
+- **Áudio:** grava em AAC mono (64 kbps, 22 kHz), com iniciar, parar e cancelar.
+- **Manutenção:** apagar arquivos, medir o tamanho de um arquivo e o espaço total ocupado pelas mídias.
+- **Caminhos relativos:** o banco guarda `fotos/123.jpg`, nunca o caminho completo, porque a pasta do app pode mudar de endereço entre atualizações (principalmente no iOS). Para exibir uma mídia, use `midiaService.caminho(relativo)`.
+- **Criação assíncrona:** o service deve ser criado uma vez, antes do `runApp`:
+
+```dart
+final midia = await MidiaService.criar();
+```
+
+### PermissaoService (US13)
+
+- Cobre câmera e microfone e devolve um resultado, sem lançar exceção: `concedida`, `negada`, `negadaPermanentemente` ou `restrita`. Negar uma permissão é um caso normal e não trava o app.
+- Cada permissão tem um texto `motivo`, mostrado **antes** de pedir, e um texto `alternativa`, que diz o que continua funcionando sem ela.
+- `abrirConfiguracoes()` serve para quando o usuário marcou "não perguntar de novo".
+
+### Configuração nas plataformas
+
+- **Android** (`android/app/src/main/AndroidManifest.xml`): declarar as permissões `CAMERA` e `RECORD_AUDIO`.
+- **iOS** (`ios/Runner/Info.plist`): declarar `NSCameraUsageDescription`, `NSMicrophoneUsageDescription` e `NSPhotoLibraryUsageDescription`, com textos curtos explicando o uso. O `permission_handler` também exige habilitar as permissões no `Podfile`; siga o passo a passo do README do pacote.
+
+---
+
+## Banco de dados (Drift)
+
+O banco é local (SQLite) e fica em `lib/data/services/cade_database.dart`. As fotos e os áudios ficam como arquivos no aparelho, e o banco guarda apenas o caminho relativo deles.
+
+### Tabelas
+
+| Tabela | Conteúdo | Histórias |
+|---|---|---|
+| `objetos` | Nome, foto, áudio, descrição, local, categoria, tamanho da mídia, data do registro e da última confirmação | US01, US02, US04, US07, US11, US14 |
+| `locais` | Nome (único) e foto do local, reaproveitados entre objetos | US03 |
+| `categorias` | Lista fixa criada com o banco: Documentos, Chaves, Ferramentas, Eletrônicos, Roupas, Remédios, Outros | US06 |
+| `historico_local` | Registro de cada mudança de local de um objeto | US09 |
+
+### Principais operações
+
+| Função | História |
+|---|---|
+| `registrarObjeto`, `obterOuCriarLocal` | US01, US02, US03, US04 |
+| `buscarObjetos` | US05 |
+| `obterObjeto` | US07 |
+| `objetosDoLocal`, `listarLocais`, `listarCategorias` | US06 |
+| `moverObjeto` | US09 |
+| `excluirObjeto`, `excluirLocal` | US10 |
+| `objetosAntigos` | US11 |
+| `espacoUsadoBytes` | US14 |
+
+### Configuração do projeto e do Drift
+
+**1. Instalar as dependências**
+
+```powershell
+flutter pub add drift drift_flutter path_provider path provider image_picker record permission_handler
+flutter pub add --dev drift_dev build_runner
+```
+
+**2. Criar o `build.yaml` na raiz do projeto**
+
+```yaml
+targets:
+  $default:
+    builders:
+      drift_dev:
+        options:
+          databases:
+            cade_database: lib/data/services/cade_database.dart
+          schema_dir: drift_schemas/
+          test_dir: test/drift/
+```
+
+**3. Gerar o código do banco**
+
+```powershell
+dart run build_runner build
+```
+
+Isso cria o arquivo `cade_database.g.dart`, que não deve ser editado à mão. Durante o desenvolvimento, `dart run build_runner watch` regenera o código a cada alteração.
+
+**4. Salvar o esquema da versão 1** (uma única vez, antes de alterar qualquer tabela)
+
+```powershell
+dart run drift_dev make-migrations
+```
+
+### Como alterar o banco no futuro
+
+1. Altere as tabelas em `cade_database.dart`.
+2. Aumente o `schemaVersion`.
+3. Rode `dart run drift_dev make-migrations`. O Drift gera o código de apoio da migração e os testes.
+4. Escreva o passo da migração no `onUpgrade` (`stepByStep`) e rode os testes gerados.
+
+Nunca edite uma migração que já foi lançada.
+
+### Observações
+
+- **Desenvolvimento no emulador:** se o app já rodou com uma versão antiga do banco, desinstale-o antes de rodar de novo, para o banco ser recriado.
+- **Exclusão de arquivos:** `excluirObjeto` devolve a linha apagada, para o repository poder remover também a foto e o áudio do aparelho.
+- **Busca com acento:** o `LIKE` do SQLite ignora maiúsculas apenas em letras sem acento. Melhoria prevista para depois do MVP.
+- **Testes:** o `CadeDatabase` aceita um executor no construtor, então os testes podem usar um banco em memória em vez do arquivo real.
+
+---
+
+## Status da implementação
+
+| Camada | Situação |
+|---|---|
+| Banco (`CadeDatabase`) | Pronto |
+| Services (`MidiaService`, `PermissaoService`) | Prontos |
+| Models | Prontos |
+| Repositories | Prontos |
+| ViewModels e `BaseViewModel` | Prontos |
+| `main.dart` e `app.dart` (injeção com `provider`) | A fazer |
+| Views (telas) | A fazer, começando pela de registro |
+| Reprodução de áudio (US08) | A fazer na R2 (`AudioPlayerService`) |
+| Backup manual (US15) | A fazer na R2 (`BackupService`) |
+
+---
+
 ## Releases
- 
+
 | Release | Objetivo | Histórias | Critério de saída |
 |---|---|---|---|
 | **R1: Núcleo** | Fluxo registrar → buscar → ver, offline | US12, US13, US01, US02, US03, US05, US07 | Registrar em menos de 15 s; achar um item em até 3 toques; uso sem internet |
 | **R2: MVP validado** | Cobrir o escopo do Canvas e reforçar a confiança | US04, US08, US06, US09, US10, US14, US15 | Testes com 5+ usuários, incluindo perfil não técnico; problemas críticos corrigidos |
 | **R3: Evolução** | Manter registros vivos e ganhar escala | US11, US16, F01, F02 | Decidido com os dados de uso do MVP |
- 
+
 ### Fora do escopo agora (pós-MVP)
- 
+
 - **F01:** reconhecimento de itens de uma foto de gaveta (visão computacional).
 - **F02:** alertas inteligentes e compartilhamento familiar de registros.
+
 ## Backlog priorizado
- 
+
 Valor de 1 a 5, estimado pela recorrência nas entrevistas e nas dores do Canvas.
- 
+
 | ID | História | Épico | Valor | MoSCoW | Release |
 |---|---|---|---|---|---|
 | US01 | Registrar um objeto tirando uma foto | Registrar | 5 | Must | R1 |
@@ -69,19 +307,20 @@ Valor de 1 a 5, estimado pela recorrência nas entrevistas e nas dores do Canvas
 | US16 | Tutorial curto no primeiro uso | Confiança | 2 | Could | R3 |
 | F01 | Visão computacional | Evolução | 4 | Won't (agora) | Pós-MVP |
 | F02 | Alertas e compartilhamento familiar | Evolução | 3 | Won't (agora) | Pós-MVP |
- 
+
 ## Dependências críticas
- 
+
 - **US12 (banco local offline)** é a base de tudo e deve ser a primeira entrega técnica.
 - **US13 (permissões)** precede foto (US01) e áudio (US04).
 - **US02 e US03 → US05 → US07:** a busca depende de dados cadastrados, e o detalhe depende da busca.
 - **US14 (compressão)** deve vir antes do uso intenso de áudio, por causa do risco de armazenamento.
+
 **Ordem de construção:** US12 → US13 → US01/US02 → US03 → US05 → US07 *(fim da R1)* → US14 → US04 → US08 → US06 → US09/US10 → US15 *(fim da R2)*.
- 
+
 ## Roadmap
- 
+
 Premissa: 14 semanas, sprints de 2 semanas (ajustar ao calendário real). Os marcos 1 a 8 seguem os Milestones do Canvas.
- 
+
 | Semanas | Marcos | Entrega |
 |---|---|---|
 | 1–2 | 1 e 2 | Problema, público-alvo, entrevistas e ideação |
@@ -90,11 +329,12 @@ Premissa: 14 semanas, sprints de 2 semanas (ajustar ao calendário real). Os mar
 | 9–11 | 5 (parte 2) | Desenvolvimento da R2 |
 | 12–13 | 6 | Testes com usuários e avaliação de usabilidade |
 | 14 | 7 e 8 | Correções e entrega da versão validada |
- 
+
 ## Documentos relacionados
- 
+
 - Backlog, Story Map, MVP e Roadmap (artefato interativo)
 - `Cade_Matriz_de_Riscos.xlsx`: riscos do projeto
+
 ## Equipe
- 
-Projeto desenvolvido em grupo. Itens marcados como *proposta* no backlog devem ser validados pelo grupo.
+
+Projeto desenvolvido em grupo. Matheus Emanoel e Kleyton.

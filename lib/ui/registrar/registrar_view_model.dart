@@ -1,0 +1,302 @@
+// lib/ui/registrar/registrar_view_model.dart
+//
+// Tela de registro (US01 a US04). Fluxo pensado para ser rápido:
+// só nome e local são obrigatórios; foto, áudio e categoria são opcionais.
+
+import 'dart:async';
+
+import '../../data/repositories/categoria_repository.dart';
+import '../../data/repositories/local_repository.dart';
+import '../../data/repositories/objeto_repository.dart';
+import '../../data/services/midia_service.dart';
+import '../../data/services/permissao_service.dart';
+import '../../domain/models/categoria.dart';
+import '../../domain/models/local.dart';
+import '../core/base_view_model.dart';
+
+/// Aviso para a View mostrar quando uma permissão não foi concedida (US13).
+/// O app continua funcionando: o aviso só explica a alternativa.
+class AvisoPermissao {
+  final TipoPermissao tipo;
+  final ResultadoPermissao resultado;
+  const AvisoPermissao(this.tipo, this.resultado);
+
+  String get mensagem => tipo.alternativa;
+
+  /// Se true, a View pode oferecer o botão "Abrir configurações".
+  bool get podeAbrirConfiguracoes =>
+      resultado == ResultadoPermissao.negadaPermanentemente;
+}
+
+class RegistrarViewModel extends BaseViewModel {
+  RegistrarViewModel({
+    required ObjetoRepository objetos,
+    required LocalRepository locais,
+    required CategoriaRepository categorias,
+    required MidiaService midia,
+    required PermissaoService permissoes,
+  })  : _objetos = objetos,
+        _locaisRepo = locais,
+        _categoriasRepo = categorias,
+        _midia = midia,
+        _permissoes = permissoes;
+
+  final ObjetoRepository _objetos;
+  final LocalRepository _locaisRepo;
+  final CategoriaRepository _categoriasRepo;
+  final MidiaService _midia;
+  final PermissaoService _permissoes;
+
+  // Campos do formulário
+  String _nome = '';
+  String _nomeLocal = '';
+  String _descricao = '';
+  int? _categoriaId;
+
+  // Mídias capturadas e ainda não salvas no banco
+  MidiaSalva? _fotoObjeto;
+  MidiaSalva? _fotoLocal;
+  MidiaSalva? _audio;
+
+  bool _gravando = false;
+  bool _salvando = false;
+  AvisoPermissao? _aviso;
+
+  List<Local> _locais = [];
+  List<Categoria> _categorias = [];
+
+  // ---------------------------------------------------------------
+  // Leitura para a View
+  // ---------------------------------------------------------------
+
+  String get nome => _nome;
+  String get nomeLocal => _nomeLocal;
+  int? get categoriaId => _categoriaId;
+  MidiaSalva? get fotoObjeto => _fotoObjeto;
+  MidiaSalva? get fotoLocal => _fotoLocal;
+  MidiaSalva? get audio => _audio;
+  bool get gravando => _gravando;
+  bool get salvando => _salvando;
+  AvisoPermissao? get aviso => _aviso;
+  List<Categoria> get categorias => List.unmodifiable(_categorias);
+
+  /// US03: locais já usados que combinam com o que o usuário digitou.
+  List<Local> get sugestoesDeLocal {
+    final busca = _nomeLocal.trim().toLowerCase();
+    final lista = busca.isEmpty
+        ? _locais
+        : _locais.where((l) => l.nome.toLowerCase().contains(busca));
+    return lista.take(8).toList();
+  }
+
+  /// O texto digitado é exatamente um local que já existe?
+  /// Nesse caso a foto do local já está guardada e não precisa ser tirada.
+  bool get localJaExiste {
+    final busca = _nomeLocal.trim().toLowerCase();
+    return busca.isNotEmpty && _locais.any((l) => l.nome.toLowerCase() == busca);
+  }
+
+  bool get podeSalvar =>
+      _nome.trim().isNotEmpty &&
+      _nomeLocal.trim().isNotEmpty &&
+      !_salvando &&
+      !_gravando;
+
+  // ---------------------------------------------------------------
+  // Carregamento
+  // ---------------------------------------------------------------
+
+  Future<void> iniciar() async {
+    definirEstado(EstadoTela.carregando);
+    try {
+      _locais = await _locaisRepo.listar();
+      _categorias = await _categoriasRepo.listar();
+      definirEstado(EstadoTela.sucesso);
+    } catch (_) {
+      definirEstado(EstadoTela.erro,
+          erro: 'Não foi possível abrir o registro. Tente novamente.');
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Campos de texto
+  // ---------------------------------------------------------------
+
+  void nomeAlterado(String valor) {
+    _nome = valor;
+    notifyListeners();
+  }
+
+  void nomeLocalAlterado(String valor) {
+    _nomeLocal = valor;
+    notifyListeners();
+  }
+
+  void descricaoAlterada(String valor) {
+    _descricao = valor;
+  }
+
+  void selecionarCategoria(int? id) {
+    _categoriaId = id;
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------
+  // Fotos (US01, US03) e permissões (US13)
+  // ---------------------------------------------------------------
+
+  Future<void> tirarFotoDoObjeto() async {
+    final nova = await _fotografar();
+    if (nova == null) return;
+    await _midia.apagar(_fotoObjeto?.caminhoRelativo);
+    _fotoObjeto = nova;
+    notifyListeners();
+  }
+
+  Future<void> tirarFotoDoLocal() async {
+    final nova = await _fotografar();
+    if (nova == null) return;
+    await _midia.apagar(_fotoLocal?.caminhoRelativo);
+    _fotoLocal = nova;
+    notifyListeners();
+  }
+
+  Future<void> removerFotoDoObjeto() async {
+    await _midia.apagar(_fotoObjeto?.caminhoRelativo);
+    _fotoObjeto = null;
+    notifyListeners();
+  }
+
+  Future<void> removerFotoDoLocal() async {
+    await _midia.apagar(_fotoLocal?.caminhoRelativo);
+    _fotoLocal = null;
+    notifyListeners();
+  }
+
+  Future<MidiaSalva?> _fotografar() async {
+    final resultado = await _permissoes.pedirCamera();
+    if (resultado != ResultadoPermissao.concedida) {
+      _aviso = AvisoPermissao(TipoPermissao.camera, resultado);
+      notifyListeners();
+      return null;
+    }
+    _aviso = null;
+    try {
+      return await _midia.tirarFoto();
+    } catch (_) {
+      mostrarErro('Não foi possível usar a câmera agora.');
+      return null;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Áudio (US04)
+  // ---------------------------------------------------------------
+
+  Future<void> iniciarGravacao() async {
+    final resultado = await _permissoes.pedirMicrofone();
+    if (resultado != ResultadoPermissao.concedida) {
+      _aviso = AvisoPermissao(TipoPermissao.microfone, resultado);
+      notifyListeners();
+      return;
+    }
+    _aviso = null;
+    try {
+      _gravando = await _midia.iniciarGravacao();
+    } catch (_) {
+      _gravando = false;
+      mostrarErro('Não foi possível gravar o áudio agora.');
+    }
+    notifyListeners();
+  }
+
+  Future<void> pararGravacao() async {
+    final salvo = await _midia.pararGravacao();
+    _gravando = false;
+    if (salvo != null) {
+      await _midia.apagar(_audio?.caminhoRelativo);
+      _audio = salvo;
+    }
+    notifyListeners();
+  }
+
+  Future<void> removerAudio() async {
+    await _midia.apagar(_audio?.caminhoRelativo);
+    _audio = null;
+    notifyListeners();
+  }
+
+  /// Para a View chamar quando o usuário toca em "Abrir configurações".
+  Future<void> abrirConfiguracoes() => _permissoes.abrirConfiguracoes();
+
+  void dispensarAviso() {
+    _aviso = null;
+    notifyListeners();
+  }
+
+  // ---------------------------------------------------------------
+  // Salvar
+  // ---------------------------------------------------------------
+
+  /// Devolve true se o objeto foi registrado.
+  Future<bool> salvar() async {
+    if (!podeSalvar) return false;
+    _salvando = true;
+    limparErro();
+    notifyListeners();
+
+    try {
+      // Local já existente mantém a foto que já tinha: descarta a nova.
+      if (localJaExiste && _fotoLocal != null) {
+        await _midia.apagar(_fotoLocal!.caminhoRelativo);
+        _fotoLocal = null;
+      }
+
+      final tamanho = (_fotoObjeto?.tamanhoBytes ?? 0) +
+          (_fotoLocal?.tamanhoBytes ?? 0) +
+          (_audio?.tamanhoBytes ?? 0);
+
+      await _objetos.registrar(
+        nome: _nome,
+        nomeLocal: _nomeLocal,
+        fotoPath: _fotoObjeto?.caminhoRelativo,
+        fotoLocalPath: _fotoLocal?.caminhoRelativo,
+        audioPath: _audio?.caminhoRelativo,
+        descricao: _descricao.trim().isEmpty ? null : _descricao.trim(),
+        categoriaId: _categoriaId,
+        tamanhoBytes: tamanho,
+      );
+
+      // As mídias agora pertencem ao banco: não devem ser apagadas ao sair.
+      _fotoObjeto = null;
+      _fotoLocal = null;
+      _audio = null;
+      _salvando = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      _salvando = false;
+      mostrarErro('Não foi possível salvar. Seus dados continuam aqui.');
+      return false;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Saída da tela
+  // ---------------------------------------------------------------
+
+  /// Se o usuário sair sem salvar, apaga as mídias capturadas para não
+  /// deixar arquivos órfãos ocupando espaço (US14).
+  @override
+  void dispose() {
+    unawaited(_limparPendentes());
+    super.dispose();
+  }
+
+  Future<void> _limparPendentes() async {
+    if (_gravando) await _midia.cancelarGravacao();
+    await _midia.apagar(_fotoObjeto?.caminhoRelativo);
+    await _midia.apagar(_fotoLocal?.caminhoRelativo);
+    await _midia.apagar(_audio?.caminhoRelativo);
+  }
+}

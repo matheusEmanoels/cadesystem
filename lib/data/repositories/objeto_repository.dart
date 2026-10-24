@@ -1,0 +1,148 @@
+import '../../domain/models/categoria.dart';
+import '../../domain/models/objeto_detalhe.dart';
+import '../services/cade_database.dart';
+import '../services/midia_service.dart';
+import 'categoria_repository.dart';
+import 'mappers.dart';
+
+class ObjetoRepository {
+  ObjetoRepository({
+    required CadeDatabase banco,
+    required MidiaService midia,
+    required CategoriaRepository categorias,
+  })  : _banco = banco,
+        _midia = midia,
+        _categorias = categorias;
+
+  final CadeDatabase _banco;
+  final MidiaService _midia;
+  final CategoriaRepository _categorias;
+
+  // ---------------------------------------------------------------
+  // Registrar (US01 a US04)
+  // ---------------------------------------------------------------
+
+  /// Registra um objeto. Os caminhos de mídia são RELATIVOS, como devolvidos
+  /// pelo MidiaService. Se falhar, as mídias não são apagadas: o ViewModel
+  /// ainda as tem e o usuário pode tentar de novo.
+  Future<int> registrar({
+    required String nome,
+    required String nomeLocal,
+    String? fotoPath,
+    String? fotoLocalPath,
+    String? audioPath,
+    String? descricao,
+    int? categoriaId,
+    int tamanhoBytes = 0,
+  }) {
+    if (nome.trim().isEmpty || nomeLocal.trim().isEmpty) {
+      throw ArgumentError('Nome e local são obrigatórios.');
+    }
+    return _banco.registrarObjeto(
+      nome: nome,
+      nomeLocal: nomeLocal,
+      fotoPath: fotoPath,
+      fotoLocalPath: fotoLocalPath,
+      audioPath: audioPath,
+      descricao: descricao,
+      categoriaId: categoriaId,
+      tamanhoBytes: tamanhoBytes,
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // Encontrar (US05, US06)
+  // ---------------------------------------------------------------
+
+  /// Busca por texto, com filtros opcionais de local e categoria.
+  /// Termo vazio devolve todos os objetos, do mais recente ao mais antigo.
+  ///
+  /// Os filtros são aplicados em memória: para um app de uso pessoal a lista
+  /// é pequena. Se crescer, mova o filtro para uma consulta no CadeDatabase.
+  Future<List<ObjetoDetalhe>> buscar(
+    String termo, {
+    int? localId,
+    int? categoriaId,
+  }) async {
+    final linhas = await _banco.buscarObjetos(termo);
+    final categorias = await _mapaDeCategorias();
+
+    return linhas
+        .where((l) => localId == null || l.objeto.localId == localId)
+        .where((l) =>
+            categoriaId == null || l.objeto.categoriaId == categoriaId)
+        .map((l) => ObjetoDetalhe(
+              objeto: l.objeto.paraModel(),
+              local: l.local.paraModel(),
+              categoria: categorias[l.objeto.categoriaId],
+            ))
+        .toList();
+  }
+
+  // ---------------------------------------------------------------
+  // Consultar (US07)
+  // ---------------------------------------------------------------
+
+  Future<ObjetoDetalhe?> obter(int id) async {
+    final linha = await _banco.obterObjeto(id);
+    if (linha == null) return null;
+
+    final categorias = await _mapaDeCategorias();
+    return ObjetoDetalhe(
+      objeto: linha.objeto.paraModel(),
+      local: linha.local.paraModel(),
+      categoria: categorias[linha.objeto.categoriaId],
+    );
+  }
+
+  // ---------------------------------------------------------------
+  // Manter (US09, US10, US11)
+  // ---------------------------------------------------------------
+
+  /// US09: muda o local (criando-o se for novo) e renova a confirmação.
+  /// Passar o mesmo local do objeto só renova a confirmação (US11).
+  Future<void> mover(int objetoId, String novoLocal) {
+    if (novoLocal.trim().isEmpty) {
+      throw ArgumentError('Informe o novo local.');
+    }
+    return _banco.moverObjeto(objetoId, novoLocal);
+  }
+
+  /// US10: exclui o objeto e apaga a foto e o áudio dele do aparelho.
+  /// A foto do local NÃO é apagada, porque outros objetos podem usá-la.
+  Future<void> excluir(int id) async {
+    final removido = await _banco.excluirObjeto(id);
+    if (removido == null) return;
+    await _midia.apagar(removido.fotoPath);
+    await _midia.apagar(removido.audioPath);
+  }
+
+  /// US11: objetos sem confirmação há mais de [meses] meses.
+  Future<List<ObjetoDetalhe>> listarAntigos({int meses = 11}) async {
+    final antigos = await _banco.objetosAntigos(meses: meses);
+    if (antigos.isEmpty) return [];
+
+    final locais = {for (final l in await _banco.listarLocais()) l.id: l};
+    final categorias = await _mapaDeCategorias();
+
+    final resultado = <ObjetoDetalhe>[];
+    for (final o in antigos) {
+      final local = locais[o.localId];
+      if (local == null) continue;
+      resultado.add(ObjetoDetalhe(
+        objeto: o.paraModel(),
+        local: local.paraModel(),
+        categoria: categorias[o.categoriaId],
+      ));
+    }
+    return resultado;
+  }
+
+  // ---------------------------------------------------------------
+  // Apoio
+  // ---------------------------------------------------------------
+
+  Future<Map<int, Categoria>> _mapaDeCategorias() async {
+    return {for (final c in await _categorias.listar()) c.id: c};
+  }
+}
