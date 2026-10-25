@@ -1,0 +1,37 @@
+name: CI Flutter
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+jobs:
+  analisar-e-testar:
+    name: Analisar e testar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Obter código do repositório
+        uses: actions/checkout@v6
+
+      - name: Configurar Flutter conforme o FVM
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version-file: .fvmrc
+
+      - name: Instalar dependências
+        run: flutter pub get --enforce-lockfile
+
+      - name: Gerar código do Drift
+        run: dart run build_runner build
+
+      - name: Analisar código
+        run: flutter analyze --no-pub
+
+      - name: Executar testes
+        run: flutter test --no-pub
