@@ -30,16 +30,13 @@ class AvisoPermissao {
 
 class RegistrarViewModel extends BaseViewModel {
   RegistrarViewModel({
-    required ObjetoRepository objetos,
+    required this._objetos,
     required LocalRepository locais,
     required CategoriaRepository categorias,
-    required MidiaService midia,
-    required PermissaoService permissoes,
-  })  : _objetos = objetos,
-        _locaisRepo = locais,
-        _categoriasRepo = categorias,
-        _midia = midia,
-        _permissoes = permissoes;
+    required this._midia,
+    required this._permissoes,
+  })  : _locaisRepo = locais,
+        _categoriasRepo = categorias;
 
   final ObjetoRepository _objetos;
   final LocalRepository _locaisRepo;

@@ -7,12 +7,10 @@ import 'mappers.dart';
 
 class ObjetoRepository {
   ObjetoRepository({
-    required CadeDatabase banco,
-    required MidiaService midia,
-    required CategoriaRepository categorias,
-  })  : _banco = banco,
-        _midia = midia,
-        _categorias = categorias;
+    required this._banco,
+    required this._midia,
+    required this._categorias,
+  });
 
   final CadeDatabase _banco;
   final MidiaService _midia;
