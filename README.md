@@ -177,6 +177,12 @@ final midia = await MidiaService.criar();
 
 O banco é local (SQLite) e fica em `lib/data/services/cade_database.dart`. As fotos e os áudios ficam como arquivos no aparelho, e o banco guarda apenas o caminho relativo deles.
 
+### Contrato dos dados (SCRUM-84)
+
+O cadastro exige **nome e local**, pois o objetivo do Cadê é recuperar onde o objeto foi guardado. A foto é opcional e a data do registro é preenchida automaticamente. Exemplo: nome `Documento X`, local `Gaveta do escritório`.
+
+A [estrutura de dados](docs/estrutura-de-dados.md) detalha os campos, as relações, as validações existentes e as pendências. Ela também registra a orientação atual de manter o local obrigatório e a divergência com o critério anterior do PDF de refinamento e do SCRUM-79, que permitia salvar sem local.
+
 ### Tabelas
 
 | Tabela | Conteúdo | Histórias |
