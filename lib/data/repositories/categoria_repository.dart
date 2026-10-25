@@ -5,7 +5,7 @@ import '../services/cade_database.dart';
 import 'mappers.dart';
 
 class CategoriaRepository {
-  CategoriaRepository({required CadeDatabase banco}) : _banco = banco;
+  CategoriaRepository({required this._banco});
 
   final CadeDatabase _banco;
 

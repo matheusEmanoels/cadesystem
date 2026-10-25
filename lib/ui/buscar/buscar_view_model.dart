@@ -10,12 +10,11 @@ import '../core/base_view_model.dart';
 
 class BuscarViewModel extends BaseViewModel {
   BuscarViewModel({
-    required ObjetoRepository objetos,
+    required this._objetos,
     required LocalRepository locais,
     required CategoriaRepository categorias,
     this.atrasoDaBusca = const Duration(milliseconds: 300),
-  })  : _objetos = objetos,
-        _locaisRepo = locais,
+  })  : _locaisRepo = locais,
         _categoriasRepo = categorias;
 
   final ObjetoRepository _objetos;

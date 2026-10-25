@@ -6,10 +6,9 @@ import 'mappers.dart';
 /// Locais onde os objetos são guardados (US03, US10).
 class LocalRepository {
   LocalRepository({
-    required CadeDatabase banco,
-    required MidiaService midia,
-  })  : _banco = banco,
-        _midia = midia;
+    required this._banco,
+    required this._midia,
+  });
 
   final CadeDatabase _banco;
   final MidiaService _midia;

@@ -5,8 +5,8 @@ import '../core/base_view_model.dart';
 class DetalheViewModel extends BaseViewModel {
   DetalheViewModel({
     required this.objetoId,
-    required ObjetoRepository objetos,
-  }) : _objetos = objetos;
+    required this._objetos,
+  });
 
   final int objetoId;
   final ObjetoRepository _objetos;

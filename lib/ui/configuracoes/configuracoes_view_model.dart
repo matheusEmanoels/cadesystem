@@ -9,7 +9,7 @@ import '../../data/services/midia_service.dart';
 import '../core/base_view_model.dart';
 
 class ConfiguracoesViewModel extends BaseViewModel {
-  ConfiguracoesViewModel({required MidiaService midia}) : _midia = midia;
+  ConfiguracoesViewModel({required this._midia});
 
   final MidiaService _midia;
 
