@@ -1,0 +1,109 @@
+# Estrutura de dados do Cadê (SCRUM-84)
+
+Este documento atende à definição da estrutura do registro (nome, local, foto e data), prevista na história [SCRUM-77](https://cade-system.atlassian.net/browse/SCRUM-77) e na subtarefa [SCRUM-84](https://cade-system.atlassian.net/browse/SCRUM-84). Descreve o banco existente e separa as regras do cadastro das validações ainda pendentes.
+
+## Regra do cadastro
+
+O Cadê deve responder onde um objeto foi guardado. Por isso, nome e local são obrigatórios; a foto é opcional e a data é automática. Exemplo: `Documento X` guardado em `Gaveta do escritório`. Um cadastro apenas com o nome não permite recuperar o lugar depois.
+
+| Informação | Regra | Situação no código |
+|---|---|---|
+| Nome | Obrigatório, até 50 caracteres | ViewModel e repository rejeitam nome vazio ou só com espaços; o limite de 50 caracteres ainda não foi implementado |
+| Local | Obrigatório, informado por texto | ViewModel e repository rejeitam local vazio ou só com espaços; banco e model exigem vínculo com um local |
+| Foto | Opcional | Banco e model aceitam ausência; a mídia fica em arquivo e o banco guarda o caminho relativo |
+| Data do registro | Automática | O banco preenche `registradoEm` ao inserir o objeto |
+
+### Divergência com o planejamento anterior
+
+A página 10 do documento **Cadê – Refinamento do Backlog, Papéis Scrum, Sprint Planning, Jira e Confluence** e o critério do [SCRUM-79](https://cade-system.atlassian.net/browse/SCRUM-79) permitem salvar sem local, avisando que o registro ficará incompleto.
+
+Na orientação recebida para esta documentação, o local deve continuar obrigatório para atender à finalidade principal do app. Essa orientação coincide com o README e com o fluxo de cadastro já implementado nas camadas de dados e ViewModel.
+
+O critério do SCRUM-79 ainda precisa ser alinhado à orientação atual e revisado pela equipe. Este documento registra a divergência; não altera o card nem o PDF e não declara o cadastro completo como entregue.
+
+## Armazenamento e arquitetura
+
+- Banco SQLite local, acessado pelo Drift, com nome `cade` e `schemaVersion = 1`.
+- Fotos e áudios são arquivos no aparelho; o banco guarda caminhos relativos, como `fotos/123.jpg`.
+- Não há conta de usuário nem sincronização em nuvem na estrutura atual.
+- Models representam os dados do domínio; repositories convertem as linhas do banco e coordenam as operações; ViewModels validam as entradas e controlam o estado.
+- Categorias e histórico já existem no código. Áudio está previsto para Release 2 no planejamento; a existência desses campos não significa que todas as telas e funcionalidades estejam prontas.
+
+## Tabelas existentes
+
+### `objetos`
+
+| Campo Dart | Tipo | Aceita nulo? | Papel e valor inicial |
+|---|---|---|---|
+| `id` | Inteiro | Não | Identificador gerado pelo banco |
+| `nome` | Texto | Não | Nome do objeto; espaços nas extremidades são removidos ao registrar |
+| `localId` | Inteiro | Não | Referência a `locais.id` |
+| `fotoPath` | Texto | Sim | Caminho relativo da foto do objeto |
+| `audioPath` | Texto | Sim | Caminho relativo do áudio |
+| `descricao` | Texto | Sim | Descrição complementar |
+| `categoriaId` | Inteiro | Sim | Referência a `categorias.id` |
+| `tamanhoBytes` | Inteiro | Não | Tamanho informado para as mídias do registro; padrão `0` |
+| `registradoEm` | Data e hora | Não | Momento do registro, preenchido pelo banco |
+| `confirmadoEm` | Data e hora | Não | Última confirmação de localização; começa com o momento da inserção |
+
+Há índices para nome, local e categoria. A coluna de nome não define limite de 50 caracteres nem bloqueia texto vazio por si só; a validação de preenchimento está no ViewModel e no repository.
+
+### `locais`
+
+| Campo Dart | Tipo | Aceita nulo? | Papel e valor inicial |
+|---|---|---|---|
+| `id` | Inteiro | Não | Identificador gerado pelo banco |
+| `nome` | Texto | Não | Nome único do local |
+| `fotoPath` | Texto | Sim | Caminho relativo da foto do local |
+| `criadoEm` | Data e hora | Não | Momento da criação, preenchido pelo banco |
+
+Vários objetos podem usar o mesmo local. O cadastro procura um local pelo nome, removendo espaços nas extremidades e comparando em minúsculas, antes de criar outro. A consulta não faz normalização de acentos.
+
+### `categorias`
+
+| Campo Dart | Tipo | Aceita nulo? | Papel e valor inicial |
+|---|---|---|---|
+| `id` | Inteiro | Não | Identificador gerado pelo banco |
+| `nome` | Texto | Não | Nome único da categoria |
+| `ordem` | Inteiro | Não | Ordem de exibição; padrão `0` |
+
+O banco cria inicialmente: Documentos, Chaves, Ferramentas, Eletrônicos, Roupas, Remédios e Outros. A categoria do objeto é opcional.
+
+### `historico_local`
+
+| Campo Dart | Tipo | Aceita nulo? | Papel e valor inicial |
+|---|---|---|---|
+| `id` | Inteiro | Não | Identificador gerado pelo banco |
+| `objetoId` | Inteiro | Não | Referência ao objeto movido |
+| `localAntigoId` | Inteiro | Sim | Referência ao local anterior |
+| `localNovoId` | Inteiro | Não | Referência ao novo local |
+| `alteradoEm` | Data e hora | Não | Momento da mudança, preenchido pelo banco |
+
+Ao mover para outro local, o banco altera `objetos.localId`, atualiza `confirmadoEm` e insere o histórico em uma transação. Confirmar o mesmo local só atualiza `confirmadoEm`.
+
+## Relações e integridade
+
+| Relação | Comportamento definido no banco |
+|---|---|
+| Objeto → local | Todo objeto referencia um local; a exclusão do local é restringida enquanto houver referência |
+| Objeto → categoria | Categoria opcional; excluir a categoria deixa o vínculo nulo |
+| Histórico → objeto | Excluir o objeto também exclui seu histórico |
+| Histórico → local antigo | Excluir o local antigo deixa essa referência nula |
+| Histórico → local novo | A exclusão do local é restringida enquanto houver essa referência |
+
+As chaves estrangeiras são habilitadas ao abrir o banco. O registro do objeto e a obtenção ou criação do local também acontecem em uma transação.
+
+## Pendências vinculadas aos cards
+
+- [SCRUM-78 — Nome curto](https://cade-system.atlassian.net/browse/SCRUM-78): implementar o limite de 50 caracteres e os avisos da tela.
+- [SCRUM-79 — Local](https://cade-system.atlassian.net/browse/SCRUM-79): alinhar o critério do Jira ao local obrigatório e implementar sua apresentação e validação na tela.
+- [SCRUM-84 — Estrutura de dados](https://cade-system.atlassian.net/browse/SCRUM-84): revisar esta documentação com a equipe. O documento não substitui testes de persistência nem comprova a conclusão das histórias funcionais.
+
+## Código de referência
+
+- [Banco e tabelas](../lib/data/services/cade_database.dart)
+- [Model do objeto](../lib/domain/models/objeto.dart)
+- [Model do local](../lib/domain/models/local.dart)
+- [Model da categoria](../lib/domain/models/categoria.dart)
+- [Registro no repository](../lib/data/repositories/objeto_repository.dart)
+- [Validações do cadastro](../lib/ui/registrar/registrar_view_model.dart)
