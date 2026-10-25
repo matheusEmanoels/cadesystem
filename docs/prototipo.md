@@ -30,7 +30,7 @@ Após salvar o cadastro, a busca deve mostrar o registro. Depois de salvar a mud
 ## Estados e regras para implementar
 
 - Nome vazio, só com espaços ou acima de 50 caracteres: explicar o problema e impedir salvar.
-- Local vazio ou só com espaços, no cadastro ou na edição: explicar o problema e impedir salvar. Essa é a orientação atual registrada na [estrutura de dados](estrutura-de-dados.md); o critério anterior do SCRUM-79 ainda precisa ser alinhado.
+- Local vazio ou só com espaços, no cadastro ou na edição: explicar o problema e impedir salvar. Essa é a orientação atual registrada na [estrutura de dados](estrutura-de-dados.md), já alinhada ao critério do SCRUM-79.
 - Foto ausente ou câmera negada: permitir continuar com nome e local. A explicação da permissão deve preceder a solicitação, feita apenas ao usar a câmera, conforme o SCRUM-82.
 - Sem resultados: mostrar “Nenhum objeto encontrado”. A busca deve ignorar maiúsculas/minúsculas e acentos, conforme o SCRUM-17; o desenho não comprova essa implementação.
 - Excluir exige confirmação, conforme a história de exclusão. O diálogo não está detalhado neste esboço do fluxo principal.
@@ -42,4 +42,4 @@ O planejamento prevê cadastro com poucos toques e edição do local a partir do
 
 Áudio, backup e filtros por categoria não foram incluídos no fluxo do MVP deste esboço. Os campos já existentes no código não significam que esses recursos estejam entregues.
 
-O SVG é a fonte editável do desenho e o PDF é sua versão para compartilhar. Ainda faltam revisão da equipe, publicação e anexo do protótipo no Jira. Não houve implementação de telas, teste com usuários ou encerramento do card nesta etapa.
+O SVG é a fonte editável do desenho e o PDF é sua versão para compartilhar. O protótipo foi aprovado pelo solicitante, publicado e integrado à `develop` no PR #4; o PDF foi anexado ao SCRUM-85. A revisão pelo outro integrante e a validação com usuários ainda não foram comprovadas. As telas são implementadas nos respectivos cards; o desenho não comprova a entrega do fluxo completo.
