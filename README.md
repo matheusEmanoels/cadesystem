@@ -351,6 +351,7 @@ Premissa: 14 semanas, sprints de 2 semanas (ajustar ao calendário real). Os mar
 - [Estrutura de dados e regras do cadastro (SCRUM-84)](docs/estrutura-de-dados.md)
 - [Protótipo de baixa fidelidade do fluxo principal (SCRUM-85)](docs/prototipo.md)
 - [Cadastro implementado, explicação do código e validação (SCRUM-86)](docs/cadastro.md)
+- [Identidade visual, imagens e geração dos ícones](docs/identidade-visual.md)
 - Backlog, Story Map, MVP e Roadmap (artefato interativo)
 - `Cade_Matriz_de_Riscos.xlsx`: riscos do projeto
 

@@ -96,6 +96,6 @@ Os testes usam SQLite real e substituem o serviço de mídias, evitando depender
 
 ## Situação da entrega
 
-A implementação está na branch `feature/SCRUM-86-tela-cadastro`, criada da `develop` depois do merge do protótipo. Commit, push e PR desta implementação dependem da aprovação do solicitante. O resultado do CI remoto desta mudança só poderá ser conferido após sua publicação.
+A implementação foi publicada na branch `feature/SCRUM-86-tela-cadastro`, criada da `develop` depois do merge do protótipo, e integrada pelo [PR #5](https://github.com/matheusEmanoels/cadesystem/pull/5). O [CI remoto do cadastro](https://github.com/matheusEmanoels/cadesystem/actions/runs/40224676594) passou. A personalização da marca e das imagens é descrita na [identidade visual](identidade-visual.md).
 
-A preparação e seus documentos têm evidências registradas no Jira e estão em análise. A confirmação de execução no ambiente do outro integrante e a revisão dele não foram comprovadas. O SCRUM-86 e sua história de cadastro permanecem em andamento até a revisão e publicação desta implementação. A meta de quantidade de toques e os testes com usuários não são comprovados pelos testes automatizados.
+A preparação e seus documentos têm evidências registradas no Jira e estão em análise. A confirmação de execução no ambiente do outro integrante e a revisão dele não foram comprovadas. O SCRUM-86 foi encaminhado para análise com o link do PR; a história de cadastro ainda depende dos demais critérios. A meta de quantidade de toques e os testes com usuários não são comprovados pelos testes automatizados.
