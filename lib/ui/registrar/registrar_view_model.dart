@@ -5,6 +5,8 @@
 
 import 'dart:async';
 
+import 'package:characters/characters.dart';
+
 import '../../data/repositories/categoria_repository.dart';
 import '../../data/repositories/local_repository.dart';
 import '../../data/repositories/objeto_repository.dart';
@@ -29,14 +31,16 @@ class AvisoPermissao {
 }
 
 class RegistrarViewModel extends BaseViewModel {
+  static const limiteNome = 50;
+
   RegistrarViewModel({
     required this._objetos,
     required LocalRepository locais,
     required CategoriaRepository categorias,
     required this._midia,
     required this._permissoes,
-  })  : _locaisRepo = locais,
-        _categoriasRepo = categorias;
+  }) : _locaisRepo = locais,
+       _categoriasRepo = categorias;
 
   final ObjetoRepository _objetos;
   final LocalRepository _locaisRepo;
@@ -70,11 +74,14 @@ class RegistrarViewModel extends BaseViewModel {
   String get nomeLocal => _nomeLocal;
   int? get categoriaId => _categoriaId;
   MidiaSalva? get fotoObjeto => _fotoObjeto;
+  String? get caminhoFotoObjeto =>
+      _fotoObjeto == null ? null : _midia.caminho(_fotoObjeto!.caminhoRelativo);
   MidiaSalva? get fotoLocal => _fotoLocal;
   MidiaSalva? get audio => _audio;
   bool get gravando => _gravando;
   bool get salvando => _salvando;
   AvisoPermissao? get aviso => _aviso;
+  String get motivoCamera => TipoPermissao.camera.motivo;
   List<Categoria> get categorias => List.unmodifiable(_categorias);
 
   /// US03: locais já usados que combinam com o que o usuário digitou.
@@ -90,14 +97,26 @@ class RegistrarViewModel extends BaseViewModel {
   /// Nesse caso a foto do local já está guardada e não precisa ser tirada.
   bool get localJaExiste {
     final busca = _nomeLocal.trim().toLowerCase();
-    return busca.isNotEmpty && _locais.any((l) => l.nome.toLowerCase() == busca);
+    return busca.isNotEmpty &&
+        _locais.any((l) => l.nome.toLowerCase() == busca);
   }
 
   bool get podeSalvar =>
-      _nome.trim().isNotEmpty &&
-      _nomeLocal.trim().isNotEmpty &&
+      validarNome(_nome) == null &&
+      validarLocal(_nomeLocal) == null &&
       !_salvando &&
       !_gravando;
+
+  String? validarNome(String valor) {
+    if (valor.trim().isEmpty) return 'Informe o nome do objeto.';
+    if (valor.trim().characters.length > limiteNome) {
+      return 'Use no máximo $limiteNome caracteres.';
+    }
+    return null;
+  }
+
+  String? validarLocal(String valor) =>
+      valor.trim().isEmpty ? 'Informe onde você guardou o objeto.' : null;
 
   // ---------------------------------------------------------------
   // Carregamento
@@ -110,8 +129,10 @@ class RegistrarViewModel extends BaseViewModel {
       _categorias = await _categoriasRepo.listar();
       definirEstado(EstadoTela.sucesso);
     } catch (_) {
-      definirEstado(EstadoTela.erro,
-          erro: 'Não foi possível abrir o registro. Tente novamente.');
+      definirEstado(
+        EstadoTela.erro,
+        erro: 'Não foi possível abrir o registro. Tente novamente.',
+      );
     }
   }
 
@@ -171,14 +192,14 @@ class RegistrarViewModel extends BaseViewModel {
   }
 
   Future<MidiaSalva?> _fotografar() async {
-    final resultado = await _permissoes.pedirCamera();
-    if (resultado != ResultadoPermissao.concedida) {
-      _aviso = AvisoPermissao(TipoPermissao.camera, resultado);
-      notifyListeners();
-      return null;
-    }
-    _aviso = null;
     try {
+      final resultado = await _permissoes.pedirCamera();
+      if (resultado != ResultadoPermissao.concedida) {
+        _aviso = AvisoPermissao(TipoPermissao.camera, resultado);
+        notifyListeners();
+        return null;
+      }
+      _aviso = null;
       return await _midia.tirarFoto();
     } catch (_) {
       mostrarErro('Não foi possível usar a câmera agora.');
@@ -249,7 +270,8 @@ class RegistrarViewModel extends BaseViewModel {
         _fotoLocal = null;
       }
 
-      final tamanho = (_fotoObjeto?.tamanhoBytes ?? 0) +
+      final tamanho =
+          (_fotoObjeto?.tamanhoBytes ?? 0) +
           (_fotoLocal?.tamanhoBytes ?? 0) +
           (_audio?.tamanhoBytes ?? 0);
 
@@ -279,8 +301,24 @@ class RegistrarViewModel extends BaseViewModel {
   }
 
   // ---------------------------------------------------------------
-  // Saída da tela
+  // Limpeza e saída da tela
   // ---------------------------------------------------------------
+
+  /// Limpa o cadastro após salvar ou cancelar e descarta mídias não salvas.
+  Future<void> limparFormulario() async {
+    if (_salvando) return;
+    await _limparPendentes();
+    _nome = '';
+    _nomeLocal = '';
+    _descricao = '';
+    _categoriaId = null;
+    _fotoObjeto = null;
+    _fotoLocal = null;
+    _audio = null;
+    _gravando = false;
+    _aviso = null;
+    definirEstado(EstadoTela.inicial);
+  }
 
   /// Se o usuário sair sem salvar, apaga as mídias capturadas para não
   /// deixar arquivos órfãos ocupando espaço (US14).

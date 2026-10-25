@@ -8,7 +8,7 @@ O Cadê deve responder onde um objeto foi guardado. Por isso, nome e local são 
 
 | Informação | Regra | Situação no código |
 |---|---|---|
-| Nome | Obrigatório, até 50 caracteres | ViewModel e repository rejeitam nome vazio ou só com espaços; o limite de 50 caracteres ainda não foi implementado |
+| Nome | Obrigatório, até 50 caracteres | ViewModel e repository rejeitam nome vazio ou só com espaços; a tela e o ViewModel limitam o nome a 50 caracteres visíveis |
 | Local | Obrigatório, informado por texto | ViewModel e repository rejeitam local vazio ou só com espaços; banco e model exigem vínculo com um local |
 | Foto | Opcional | Banco e model aceitam ausência; a mídia fica em arquivo e o banco guarda o caminho relativo |
 | Data do registro | Automática | O banco preenche `registradoEm` ao inserir o objeto |
@@ -19,7 +19,7 @@ A página 10 do documento **Cadê – Refinamento do Backlog, Papéis Scrum, Spr
 
 Na orientação recebida para esta documentação, o local deve continuar obrigatório para atender à finalidade principal do app. Essa orientação coincide com o README e com o fluxo de cadastro já implementado nas camadas de dados e ViewModel.
 
-O critério do SCRUM-79 ainda precisa ser alinhado à orientação atual e revisado pela equipe. Este documento registra a divergência; não altera o card nem o PDF e não declara o cadastro completo como entregue.
+O critério do SCRUM-79 foi alinhado à orientação atual, com comentário registrando o motivo da mudança. O PDF anterior foi preservado como histórico. A revisão pelo outro integrante e a conclusão das histórias funcionais continuam dependendo dos respectivos critérios.
 
 ## Armazenamento e arquitetura
 
@@ -95,8 +95,8 @@ As chaves estrangeiras são habilitadas ao abrir o banco. O registro do objeto e
 
 ## Pendências vinculadas aos cards
 
-- [SCRUM-78 — Nome curto](https://cade-system.atlassian.net/browse/SCRUM-78): implementar o limite de 50 caracteres e os avisos da tela.
-- [SCRUM-79 — Local](https://cade-system.atlassian.net/browse/SCRUM-79): alinhar o critério do Jira ao local obrigatório e implementar sua apresentação e validação na tela.
+- [SCRUM-78 — Nome curto](https://cade-system.atlassian.net/browse/SCRUM-78): limite de 50 caracteres e avisos implementados no cadastro do SCRUM-86; revisar a entrega e validar os demais critérios da história.
+- [SCRUM-79 — Local](https://cade-system.atlassian.net/browse/SCRUM-79): critério alinhado ao local obrigatório e campo conectado ao cadastro do SCRUM-86; revisar a entrega e validar os demais critérios da história.
 - [SCRUM-84 — Estrutura de dados](https://cade-system.atlassian.net/browse/SCRUM-84): revisar esta documentação com a equipe. O documento não substitui testes de persistência nem comprova a conclusão das histórias funcionais.
 
 ## Código de referência

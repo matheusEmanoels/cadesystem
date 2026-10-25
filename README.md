@@ -168,8 +168,8 @@ final midia = await MidiaService.criar();
 
 ### Configuração nas plataformas
 
-- **Android** (`android/app/src/main/AndroidManifest.xml`): declarar as permissões `CAMERA` e `RECORD_AUDIO`.
-- **iOS** (`ios/Runner/Info.plist`): declarar `NSCameraUsageDescription`, `NSMicrophoneUsageDescription` e `NSPhotoLibraryUsageDescription`, com textos curtos explicando o uso. O `permission_handler` também exige habilitar as permissões no `Podfile`; siga o passo a passo do README do pacote.
+- **Android** (`android/app/src/main/AndroidManifest.xml`): o cadastro declara `CAMERA`, com câmera opcional no aparelho. `RECORD_AUDIO` deve acompanhar a ativação do áudio na Release 2; a tela atual não pede microfone.
+- **iOS** (`ios/Runner/Info.plist`): o cadastro declara `NSCameraUsageDescription`. Este projeto usa Swift Package Manager, e a versão instalada de `permission_handler_apple` resolve a câmera a partir dessa chave. Descrições de microfone e galeria devem acompanhar a implementação desses fluxos. A configuração ainda precisa ser validada em um ambiente Apple.
 
 ---
 
@@ -207,11 +207,10 @@ A [estrutura de dados](docs/estrutura-de-dados.md) detalha os campos, as relaç�
 
 ### Configuração do projeto e do Drift
 
-**1. Instalar as dependências**
+**1. Instalar as dependências com o Flutter definido no FVM**
 
 ```powershell
-flutter pub add drift drift_flutter path_provider path provider image_picker record permission_handler
-flutter pub add --dev drift_dev build_runner
+fvm flutter pub get
 ```
 
 **2. Criar o `build.yaml` na raiz do projeto**
@@ -231,7 +230,7 @@ targets:
 **3. Gerar o código do banco**
 
 ```powershell
-dart run build_runner build
+fvm dart run build_runner build
 ```
 
 Isso cria o arquivo `cade_database.g.dart`, que não deve ser editado à mão. Durante o desenvolvimento, `dart run build_runner watch` regenera o código a cada alteração.
@@ -255,7 +254,7 @@ Nunca edite uma migração que já foi lançada.
 
 - **Desenvolvimento no emulador:** se o app já rodou com uma versão antiga do banco, desinstale-o antes de rodar de novo, para o banco ser recriado.
 - **Exclusão de arquivos:** `excluirObjeto` devolve a linha apagada, para o repository poder remover também a foto e o áudio do aparelho.
-- **Busca com acento:** o `LIKE` do SQLite ignora maiúsculas apenas em letras sem acento. Melhoria prevista para depois do MVP.
+- **Busca com acento:** o `LIKE` do SQLite ignora maiúsculas apenas em letras sem acento. A normalização exigida pelo SCRUM-17 ainda está pendente e deve acompanhar a implementação da busca.
 - **Testes:** o `CadeDatabase` aceita um executor no construtor, então os testes podem usar um banco em memória em vez do arquivo real.
 
 ---
@@ -269,10 +268,21 @@ Nunca edite uma migração que já foi lançada.
 | Models | Prontos |
 | Repositories | Prontos |
 | ViewModels e `BaseViewModel` | Prontos |
-| `main.dart` e `app.dart` (injeção com `provider`) | A fazer |
-| Views (telas) | A fazer, começando pela de registro |
+| `main.dart` e `app.dart` (injeção com `provider`) | Inicialização do banco e das mídias conectada à tela de cadastro |
+| View de cadastro | Implementada: nome e local obrigatórios, nome até 50 caracteres, foto opcional e salvamento local |
+| Views de busca, detalhes e configurações | A fazer |
 | Reprodução de áudio (US08) | A fazer na R2 (`AudioPlayerService`) |
 | Backup manual (US15) | A fazer na R2 (`BackupService`) |
+
+### Executar e validar o cadastro
+
+Selecione o emulador Android no VS Code e execute a configuração `cadesystem` com F5, ou use `fvm flutter run`. O aplicativo inicia em **Novo objeto**, substituindo o contador de exemplo do Flutter.
+
+O cadastro permite salvar nome e local sem foto, explica o uso da câmera antes de solicitar acesso e mostra confirmação após salvar. Cancelar limpa o formulário sem gravar. A busca dos registros ainda depende da implementação de sua tela; salvar não abre uma busca que ainda não existe.
+
+Os testes em `test/registrar_view_test.dart` e `test/registrar_view_model_test.dart` verificam o formulário, a gravação no SQLite em memória, o limite do nome, a rejeição de campos vazios, a preservação dos dados em falha e a disposição em tela estreita com texto ampliado. Execute com `fvm flutter test`; a análise é feita com `fvm flutter analyze`.
+
+Nesta etapa a execução foi validada no Android. A descrição de uso da câmera foi incluída no iOS, mas a compilação e as permissões no iOS ainda precisam ser verificadas em um ambiente Apple.
 
 ---
 
@@ -340,6 +350,7 @@ Premissa: 14 semanas, sprints de 2 semanas (ajustar ao calendário real). Os mar
 
 - [Estrutura de dados e regras do cadastro (SCRUM-84)](docs/estrutura-de-dados.md)
 - [Protótipo de baixa fidelidade do fluxo principal (SCRUM-85)](docs/prototipo.md)
+- [Cadastro implementado, explicação do código e validação (SCRUM-86)](docs/cadastro.md)
 - Backlog, Story Map, MVP e Roadmap (artefato interativo)
 - `Cade_Matriz_de_Riscos.xlsx`: riscos do projeto
 
