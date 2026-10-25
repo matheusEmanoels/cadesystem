@@ -3,7 +3,8 @@
 // Tela de configurações. Por enquanto: espaço usado pelas mídias (US14).
 // O backup manual (US15) entra aqui na R2, com um BackupService próprio.
 
-import '../../core/utils/formatadores.dart';
+import 'package:cadesystem/ui/utils/formatadores.dart';
+
 import '../../data/services/midia_service.dart';
 import '../core/base_view_model.dart';
 
