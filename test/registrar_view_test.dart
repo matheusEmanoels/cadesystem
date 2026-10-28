@@ -27,7 +27,7 @@ Future<CadeDatabase> _abrirApp(WidgetTester tester) async {
 }
 
 Future<void> _tocarEmSalvar(WidgetTester tester) async {
-  final botao = find.widgetWithText(FilledButton, 'Salvar objeto');
+  final botao = find.text('Salvar objeto');
   await tester.ensureVisible(botao);
   await tester.tap(botao);
   await tester.pumpAndSettle();
@@ -79,6 +79,7 @@ void main() {
     tester,
   ) async {
     await _abrirApp(tester);
+    await tester.ensureVisible(find.text('Adicionar foto'));
     await tester.tap(find.text('Adicionar foto'));
     await tester.pumpAndSettle();
     expect(find.text('Usar câmera'), findsOneWidget);

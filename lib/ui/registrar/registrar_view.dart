@@ -90,7 +90,24 @@ class _RegistrarViewState extends State<RegistrarView> {
     return PopScope(
       canPop: !ocupado,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Cadê?')),
+        appBar: AppBar(
+          title: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/branding/cade-icon.png',
+                  width: 36,
+                  height: 36,
+                  cacheWidth: 108,
+                  excludeFromSemantics: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text('Cadê?'),
+            ],
+          ),
+        ),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24),
@@ -102,6 +119,13 @@ class _RegistrarViewState extends State<RegistrarView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      Image.asset(
+                        'assets/branding/cade-drawer.png',
+                        height: 120,
+                        cacheWidth: 360,
+                        semanticLabel: 'Documento guardado em uma gaveta',
+                      ),
+                      const SizedBox(height: 16),
                       Text(
                         'Novo objeto',
                         style: Theme.of(context).textTheme.headlineSmall,
@@ -120,6 +144,7 @@ class _RegistrarViewState extends State<RegistrarView> {
                           controller: _nome,
                           enabled: !ocupado,
                           decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.inventory_2_outlined),
                             hintText: 'Ex.: Documento X',
                             errorMaxLines: 3,
                           ),
@@ -141,6 +166,7 @@ class _RegistrarViewState extends State<RegistrarView> {
                           controller: _local,
                           enabled: !ocupado,
                           decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.location_on_outlined),
                             hintText: 'Ex.: Gaveta do escritório',
                             errorMaxLines: 3,
                           ),
@@ -215,16 +241,18 @@ class _RegistrarViewState extends State<RegistrarView> {
                         ),
                       ],
                       const SizedBox(height: 24),
-                      FilledButton(
+                      FilledButton.icon(
                         onPressed: ocupado ? null : _salvar,
-                        child: Text(
+                        icon: const Icon(Icons.save_outlined),
+                        label: Text(
                           viewModel.salvando ? 'Salvando…' : 'Salvar objeto',
                         ),
                       ),
                       const SizedBox(height: 8),
-                      TextButton(
+                      TextButton.icon(
                         onPressed: ocupado ? null : _limpar,
-                        child: const Text('Cancelar'),
+                        icon: const Icon(Icons.close),
+                        label: const Text('Cancelar'),
                       ),
                     ],
                   ),
